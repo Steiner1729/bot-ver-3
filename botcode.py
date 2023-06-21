@@ -1,31 +1,33 @@
 import discord
 from discord.ext import commands
 import youtube_dl
+import os
 
-# Discord bot token
-with open('./token', 'r') as f:
-    TOKEN = f.read()
-    # TOKEN = 'MTEwNzIxMDkwMjAzMTMwNjgxMw.G9wKNf.354sY2bvnSVVjIPBTzHlFYeAbQkyyhc9QcjXEI'
-
-# Create a Discord bot instance
+# Create a bot instance
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 
+# Event for when the bot is ready
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name}')
+    print("BOT READY.")
 
+
+# Command to play music
 @bot.command()
 async def play(ctx, url):
-    # Check if the user is in a voice channel
-    if ctx.author.voice is None or ctx.author.voice.channel is None:
-        await ctx.send("You need to join a voice channel first.")
+    voice_channel = ctx.author.voice.channel
+    if voice_channel is None:
+        await ctx.send("You must be in a voice channel to use this command.")
         return
 
-    # Join the voice channel
-    channel = ctx.author.voice.channel
-    voice_client = await channel.connect()
+    # Check if the bot is already in a voice channel
+    if ctx.voice_client is not None:
+        await ctx.voice_client.disconnect()
 
-    # Download audio from YouTube
+    # Connect to the voice channel
+    vc = await voice_channel.connect()
+
+    # Download the audio from YouTube
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -33,22 +35,17 @@ async def play(ctx, url):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
+        'outtmpl': '%(id)s.%(ext)s',
+        'verbose' : True
     }
+
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         url2 = info['formats'][0]['url']
-        source = await discord.FFmpegOpusAudio.from_probe(url2)
+        ydl.download([url])
 
-    # Play audio
-    voice_client.play(source)
-    await ctx.send(f'Now playing: {info["title"]}')
-
-@bot.command()
-async def stop(ctx):
-    # Check if the bot is in a voice channel
-    if ctx.voice_client is not None:
-        await ctx.voice_client.disconnect()
-        await ctx.send('Bot disconnected')
+    # Play the audio
+    vc.play(discord.FFmpegPCMAudio(f"{info['id']}.mp3"))
 
 # Run the bot
-bot.run(TOKEN)
+bot.run('MTEwNzIxMDkwMjAzMTMwNjgxMw.Ge_0d-.Lht0fwImeIqi2IvbEqvAkvyj8F8WmKzy7Hz-Ag')
